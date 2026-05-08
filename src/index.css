@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+button[class*="bg-[#24a048]"] {
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  border: none !important;
+  outline: none !important;
+  filter: drop-shadow(0 0 0 transparent) !important;
+}
