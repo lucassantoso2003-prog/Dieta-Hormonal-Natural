@@ -1,4 +1,129 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+function WhatsAppAudio({ src, avatar, isMic }: { src?: string, avatar?: string, isMic?: boolean }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  
+  React.useEffect(() => {
+    if (!audioRef.current && src) {
+      const audio = new Audio(src);
+      audioRef.current = audio;
+      
+      const handleTimeUpdate = () => {
+        if (audio.duration) {
+          setProgress((audio.currentTime / audio.duration) * 100);
+        }
+      };
+      
+      const handleEnded = () => {
+        setIsPlaying(false);
+        setProgress(0);
+      };
+      
+      audio.addEventListener('timeupdate', handleTimeUpdate);
+      audio.addEventListener('ended', handleEnded);
+      
+      return () => {
+        audio.removeEventListener('timeupdate', handleTimeUpdate);
+        audio.removeEventListener('ended', handleEnded);
+        audio.pause();
+      };
+    }
+  }, [src]);
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play().catch(console.error);
+      }
+      setIsPlaying(!isPlaying);
+    } else {
+      // Simulation for mockup when no src is provided
+      setIsPlaying(!isPlaying);
+      if (!isPlaying) {
+        let p = 0;
+        const interval = setInterval(() => {
+          p += (100 / 150); // Simulates 15 seconds audio
+          if (p >= 100) {
+            clearInterval(interval);
+            setIsPlaying(false);
+            setProgress(0);
+          } else {
+            setProgress(p);
+          }
+        }, 100);
+      }
+    }
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const percent = (e.clientX - rect.left) / rect.width;
+    
+    if (audioRef.current && audioRef.current.duration) {
+      audioRef.current.currentTime = percent * audioRef.current.duration;
+      setProgress(percent * 100);
+    } else if (isPlaying) {
+      setProgress(percent * 100);
+    }
+  };
+
+  // Pre-defined random heights for the audio bars
+  const bars = [2, 4, 3, 5, 4, 7, 5, 3, 6, 8, 5, 4, 6, 3, 5, 4, 3, 5, 4, 2];
+
+  return (
+    <div className="bg-[#0f172a] rounded-[22px] p-1.5 pr-3 flex items-center gap-2 w-full max-w-[340px] mx-auto shadow-md">
+      <div 
+        onClick={togglePlay}
+        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 cursor-pointer active:scale-95 transition-transform"
+      >
+        {isPlaying ? (
+          <div className="w-10 h-10 bg-[#24a048] rounded-full flex items-center justify-center shadow-md">
+             <div className="w-[10px] h-3.5 flex justify-between">
+                <div className="w-[3px] h-full bg-white rounded-sm"></div>
+                <div className="w-[3px] h-full bg-white rounded-sm"></div>
+             </div>
+          </div>
+        ) : (
+          <div className="w-10 h-10 bg-[#24a048] rounded-full flex items-center justify-center shadow-md pl-1">
+             <div className="w-0 h-0 border-t-[5px] border-t-transparent border-l-[8px] border-l-white border-b-[5px] border-b-transparent rounded-sm"></div>
+          </div>
+        )}
+      </div>
+      
+      <div className="flex-1 flex flex-col justify-center select-none overflow-hidden mx-1">
+        <div 
+          className="flex items-center h-8 cursor-pointer relative w-full" 
+          onClick={handleSeek}
+        >
+          <div className="w-full h-full flex items-center gap-[2.5px]">
+            {bars.map((h, i) => {
+              const barPercent = (i / bars.length) * 100;
+              const isActive = barPercent <= progress;
+              
+              return (
+                <div 
+                  key={i} 
+                  className={`flex-1 rounded-full transition-colors duration-100 ${isActive ? 'bg-[#24a048]' : 'bg-white/20'}`} 
+                  style={{ height: `${h * 3}px` }}
+                ></div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      
+      {isMic ? (
+        <div className="bg-slate-700 w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-sm">🎙️</div>
+      ) : avatar ? (
+        <img src={avatar} className="w-9 h-9 rounded-full shrink-0 object-cover border border-slate-600" alt="Profile" />
+      ) : null}
+    </div>
+  );
+}
 
 function StepOne({ onNext }: { onNext: () => void }) {
   return (
@@ -175,9 +300,10 @@ function StepFive({ onNext }: { onNext: () => void }) {
           </div>
         </div>
 
-        <div className="mt-4 mb-4 text-center px-4 w-full">
-          <p className="font-semibold text-[13.5px] leading-tight text-slate-800 text-balance w-full">
-            📗 SIGA <span className="text-[#24a048] underline">2 PASSOS</span> PARA ELIMINAR 1KG/SEMANA<br/> E ALIVIAR SEUS SINTOMAS
+        <div className="mt-4 mb-4 text-center w-full">
+          <p className="font-bold text-[13px] sm:text-[14.5px] leading-tight tracking-tighter text-slate-800 flex flex-col gap-0.5">
+            <span className="whitespace-nowrap object-center">📗 SIGA <span className="text-[#24a048] underline">2 PASSOS</span> PARA ELIMINAR 1KG/SEMANA</span>
+            <span className="whitespace-nowrap">E ALIVIAR SEUS SINTOMAS</span>
           </p>
         </div>
       </div>
@@ -193,7 +319,7 @@ function StepFive({ onNext }: { onNext: () => void }) {
 
 function StepSix({ onNext }: { onNext: () => void }) {
   return (
-    <div className="flex flex-col w-full max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[100dvh] justify-center items-center py-10 px-5 my-auto">
+    <div className="flex flex-col w-full max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[100dvh] justify-center items-center pt-10 pb-24 px-5 my-auto">
       <div className="flex flex-col items-center w-full">
         <div className="bg-[#24a048] text-white px-2 py-0.5 rounded text-sm font-bold flex items-center gap-1 mb-2">
           <span className="opacity-80 text-xs">👇</span> PASSO 01 <span className="opacity-80 text-xs">👇</span>
@@ -202,9 +328,9 @@ function StepSix({ onNext }: { onNext: () => void }) {
           Siga a Semana da <strong className="text-[#24a048] font-black underline decoration-[3px] underline-offset-4">DESINFLAMAÇÃO</strong>
         </h1>
         
-        <p className="mt-4 text-center text-[13.5px] sm:text-[14px] leading-tight text-slate-800 px-1">
-          🔥 Um passo a passo de <strong className="font-black">07 Dias</strong> para você<br/>
-          <strong className="text-[#d82a27] font-black uppercase">Desinflamar a gordura da barriga 🔥</strong>
+        <p className="mt-4 text-center text-[13px] sm:text-[14px] leading-tight tracking-tighter text-slate-800 px-0 flex flex-col w-full items-center">
+          <span className="whitespace-nowrap">🔥 Um passo a passo de <strong className="font-black">07 Dias</strong> para você</span>
+          <strong className="text-[#d82a27] font-black uppercase whitespace-nowrap text-[12.5px] sm:text-[13.5px]">Desinflamar a gordura da barriga 🔥</strong>
         </p>
 
         <div className="w-full mt-5 rounded-2xl overflow-hidden flex items-center justify-center p-0.5 relative">
@@ -221,18 +347,17 @@ function StepSix({ onNext }: { onNext: () => void }) {
           A <span className="underline decoration-slate-400 underline-offset-2">Meire</span> perdeu <strong className="font-black uppercase">4 Quilos em 1 semana</strong> de<br/> <strong className="bg-[#24a048] text-white px-1 py-0.5 rounded-[3px]">PROTOCOLO DE DESINFLAMAÇÃO</strong>🔥
         </p>
 
-        <div className="w-full mt-5 rounded-2xl overflow-hidden flex items-center justify-center p-0.5 relative">
-          {/* Placeholder para a imagem "Antes e Depois" */}
+        <div className="w-full mt-5 flex items-center justify-center relative">
+          {/* Imagem "Antes e Depois" inserida pelo usuário */}
           <img 
-            src="https://images.unsplash.com/photo-1542282088-fe8426682b8f?q=80&w=800&auto=format&fit=crop" 
-            alt="Antes e Depois"
-            referrerPolicy="no-referrer"
-            className="w-full h-auto object-cover rounded-xl"
+            src="https://i.imgur.com/ybaowuv.jpeg" 
+            alt="Antes e Depois da Meire"
+            className="w-full h-auto object-contain"
           />
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 w-full bg-gradient-to-t from-white via-white/90 to-transparent pt-10 pb-3 z-50 px-5 pointer-events-none">
+      <div className="fixed bottom-0 left-0 w-full bg-gradient-to-t from-white via-white/80 to-transparent pt-4 pb-3 z-50 px-5 pointer-events-none">
         <div className="max-w-[480px] mx-auto w-full pointer-events-auto">
           <button onClick={onNext} className="w-[94%] max-w-[340px] mx-auto bg-[#24a048] text-white rounded-xl py-4 font-bold text-[15px] hover:bg-[#1a7f38] transition-colors active:scale-[0.98] flex items-center justify-center gap-2 shadow-xl shadow-[#24a048]/20" style={{ boxShadow: '0 10px 25px -5px rgba(36, 160, 72, 0.4)' }}>
             QUERO RECEBER <span className="bg-white/20 rounded text-xs px-1 py-0.5">✔</span>
@@ -262,7 +387,7 @@ function StepSeven({ onNext }: { onNext: () => void }) {
 
         <div className="w-full mt-5 rounded-2xl overflow-hidden flex items-center justify-center p-0.5 relative">
           <img 
-            src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?q=80&w=800&auto=format&fit=crop" 
+            src="https://i.imgur.com/NpfUWNG.jpeg" 
             alt="Dieta Hormonal Cardápio"
             referrerPolicy="no-referrer"
             className="w-full h-auto object-cover rounded-xl shadow-sm"
@@ -312,6 +437,57 @@ function StepSeven({ onNext }: { onNext: () => void }) {
 }
 
 function StepEight({ onNext }: { onNext: () => void }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const images = [
+    ["https://i.imgur.com/TU9njY4.png"],
+    ["https://i.imgur.com/bUmnEL7.png"],
+    ["https://i.imgur.com/JWbVmMv.png"],
+    ["https://i.imgur.com/DsBauve.jpeg", "https://i.imgur.com/GHSYeJ9.png"]
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % images.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const getIndex = (offset: number) => {
+    return (currentIndex + offset + images.length) % images.length;
+  };
+
+  const renderCarouselItem = (itemImages: string[], isMain: boolean) => {
+    if (isMain) {
+      if (itemImages.length === 1) {
+        return (
+          <img 
+            key={currentIndex}
+            src={itemImages[0]} 
+            alt="Antes e Depois"
+            referrerPolicy="no-referrer"
+            className="w-full h-auto object-cover rounded-xl shadow-md border border-slate-100 z-10 relative animate-in fade-in zoom-in-[0.98] duration-700 bg-white"
+          />
+        );
+      }
+      return (
+        <div key={currentIndex} className="w-full flex md:basis-auto flex-col rounded-xl shadow-md border border-slate-100 z-10 relative overflow-hidden animate-in fade-in zoom-in-[0.98] duration-700 bg-white">
+          <img src={itemImages[0]} alt="Antes e Depois Top" referrerPolicy="no-referrer" className="w-full h-auto object-cover block" />
+          <img src={itemImages[1]} alt="Antes e Depois Bottom" referrerPolicy="no-referrer" className="w-full h-auto object-cover block" />
+        </div>
+      );
+    } else {
+      if (itemImages.length === 1) {
+        return <img src={itemImages[0]} className="w-full h-full object-cover blur-sm transition-all duration-700" alt="" />;
+      }
+      return (
+        <div className="w-full h-full flex flex-col transition-all duration-700 blur-sm bg-white">
+          <img src={itemImages[0]} className="w-full h-1/2 object-cover block" alt="" />
+          <img src={itemImages[1]} className="w-full h-1/2 object-cover block" alt="" />
+        </div>
+      );
+    }
+  };
+
   return (
     <div className="flex flex-col w-full max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[100dvh]">
       <div className="flex flex-col items-center w-full pt-10 pb-32">
@@ -326,25 +502,16 @@ function StepEight({ onNext }: { onNext: () => void }) {
 
         <div className="w-full mt-6 relative overflow-hidden flex flex-col items-center">
           <div className="w-[85%] mx-auto relative flex items-center justify-center">
-            <div className="absolute -left-[15%] top-0 bottom-0 w-[12%] bg-slate-200 rounded-xl overflow-hidden shadow-inner opacity-70">
-              <img src="https://images.unsplash.com/photo-1542282088-fe8426682b8f?q=80&w=800&auto=format&fit=crop" className="w-full h-full object-cover blur-sm" alt="" />
+            <div className="absolute -left-[15%] top-0 bottom-0 w-[12%] bg-slate-200 rounded-xl overflow-hidden shadow-inner opacity-70 transition-all duration-700">
+              {renderCarouselItem(images[getIndex(-1)], false)}
             </div>
             
-            <img 
-              src="https://images.unsplash.com/photo-1542282088-fe8426682b8f?q=80&w=800&auto=format&fit=crop" 
-              alt="Antes e Depois"
-              referrerPolicy="no-referrer"
-              className="w-full h-auto object-cover rounded-xl shadow-md border border-slate-100 z-10 relative"
-            />
+            {renderCarouselItem(images[currentIndex], true)}
             
-            <div className="absolute -right-[15%] top-0 bottom-0 w-[12%] bg-slate-200 rounded-xl overflow-hidden shadow-inner opacity-70">
-              <img src="https://images.unsplash.com/photo-1542282088-fe8426682b8f?q=80&w=800&auto=format&fit=crop" className="w-full h-full object-cover blur-sm" alt="" />
+            <div className="absolute -right-[15%] top-0 bottom-0 w-[12%] bg-slate-200 rounded-xl overflow-hidden shadow-inner opacity-70 transition-all duration-700">
+              {renderCarouselItem(images[getIndex(1)], false)}
             </div>
           </div>
-          <p className="mt-4 text-center text-[13px] sm:text-[14px] text-slate-800 px-0 leading-tight tracking-tight">
-            A Meire perdeu <strong className="font-black">4 KGs apenas na Primeira Semana</strong><br/>
-            de Desinflamação.
-          </p>
         </div>
 
         <div className="w-full mt-10 space-y-3 px-3 sm:px-8">
@@ -416,7 +583,7 @@ function StepTen({ onNext }: { onNext: () => void }) {
         </h1>
         
         <p className="mt-3 text-center text-[13.5px] sm:text-[14.5px] font-medium text-slate-800 leading-snug px-0">
-          Protocolo com o <strong className="text-[#d82a27] font-bold">Alimentos Afrodisíacos e chás, shots e ervas</strong> <u className="underline-offset-2">que aumentam a Libido.</u>
+          Protocolo com <strong className="text-[#d82a27] font-bold">alimentos afrodisíacos, chás, shots e ervas</strong> <u className="underline-offset-2">que aumentam a Libido.</u>
         </p>
 
         <div className="w-full mt-4 rounded-2xl overflow-hidden flex items-center justify-center p-0.5 relative">
@@ -438,30 +605,6 @@ function StepTen({ onNext }: { onNext: () => void }) {
   );
 }
 
-
-function StepThirteen({ onNext }: { onNext: () => void }) {
-  return (
-    <div className="flex flex-col w-full max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[100dvh] justify-center py-12 px-5">
-      <div className="flex flex-col items-center w-full">
-        <h1 className="text-[1.25rem] sm:text-[1.4rem] tracking-tight font-bold text-center text-slate-800 leading-tight px-0 text-balance w-full">
-          Você tem desejos de comer <strong className="text-[#d82a27] font-black">Doces, Salgados e Massas?</strong> 🍔
-        </h1>
-        
-        <div className="flex flex-col gap-4 mt-8 w-full">
-          <button onClick={onNext} className="w-[94%] max-w-[340px] mx-auto flex items-center justify-start gap-3 bg-white border border-[#24a048] shadow-sm rounded-xl py-4 px-4 hover:bg-slate-50 transition-all active:scale-[0.98]">
-            <span className="text-[22px] sm:text-2xl drop-shadow-sm shrink-0">😭</span>
-            <span className="text-slate-800 font-medium text-[13px] sm:text-[14px] whitespace-nowrap overflow-hidden text-ellipsis w-full text-left"><strong className="text-[#24a048] font-black uppercase">SIM!</strong> Acho muito difícil de parar.</span>
-          </button>
-
-          <button onClick={onNext} className="w-[94%] max-w-[340px] mx-auto flex items-center justify-start gap-3 bg-white border border-slate-200 shadow-sm rounded-xl py-4 px-4 hover:border-slate-400 hover:shadow-md transition-all active:scale-[0.98]">
-            <span className="text-[22px] sm:text-2xl drop-shadow-sm shrink-0">🙄</span>
-            <span className="text-slate-800 font-medium text-[13px] sm:text-[14px] whitespace-nowrap overflow-hidden text-ellipsis w-full text-left"><strong className="font-black uppercase">NÃO!</strong> Não tenho esses desejos</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function StepTwelve({ onNext }: { onNext?: () => void }) {
   return (
@@ -491,7 +634,7 @@ function StepTwelve({ onNext }: { onNext?: () => void }) {
 
         <div className="w-full mt-5 rounded-2xl overflow-hidden flex items-center justify-center p-0.5 relative">
           <img 
-            src="https://images.unsplash.com/photo-1542596594-649edbc13630?q=80&w=800&auto=format&fit=crop" 
+            src="https://i.imgur.com/linUxsl.png" 
             alt="Antes e Depois Gisela"
             referrerPolicy="no-referrer"
             className="w-full aspect-square object-cover rounded-2xl shadow-sm"
@@ -539,90 +682,19 @@ function StepEleven({ onNext }: { onNext: () => void }) {
           <strong className="text-[#d82a27] font-black uppercase">SINTOMAS</strong>? 👇 💔 😔
         </h1>
         
-        <div className="grid grid-cols-2 gap-1 w-full mt-6 px-1">
-          <div className="relative aspect-square rounded-tl-2xl overflow-hidden">
-            <img src="https://images.unsplash.com/photo-1555505019-8c3f1c4aba5f?q=80&w=400&auto=format&fit=crop" className="w-full h-full object-cover" alt="Calorão" />
-            <div className="absolute bottom-2 inset-x-0 mx-1 flex justify-center">
-              <span className="bg-[#d82a27] text-white text-[10px] sm:text-[11px] font-bold px-1.5 py-0.5 rounded text-center whitespace-nowrap">CALORÃO/FOGACHO</span>
-            </div>
-          </div>
-          <div className="relative aspect-square rounded-tr-2xl overflow-hidden">
-            <img src="https://images.unsplash.com/photo-1588667500139-6f97fd1d7915?q=80&w=400&auto=format&fit=crop" className="w-full h-full object-cover" alt="Falta de Libido" />
-            <div className="absolute bottom-2 inset-x-0 mx-1 flex justify-center">
-              <span className="bg-[#d82a27] text-white text-[10px] sm:text-[11px] font-bold px-1.5 py-0.5 rounded text-center whitespace-nowrap">FALTA DE LIBIDO</span>
-            </div>
-          </div>
-          <div className="relative aspect-square rounded-bl-2xl overflow-hidden">
-            <img src="https://images.unsplash.com/photo-1542598953-ce20b666a7b7?q=80&w=400&auto=format&fit=crop" className="w-full h-full object-cover" alt="Cansaço" />
-            <div className="absolute bottom-2 inset-x-0 mx-1 flex justify-center">
-              <span className="bg-[#d82a27] text-white text-[10px] sm:text-[11px] font-bold px-1.5 py-0.5 rounded text-center whitespace-nowrap">CANSAÇO E DESÂNIMO</span>
-            </div>
-          </div>
-          <div className="relative aspect-square rounded-br-2xl overflow-hidden">
-            <img src="https://images.unsplash.com/photo-1520638025219-4824baec6d78?q=80&w=400&auto=format&fit=crop" className="w-full h-full object-cover" alt="Insônia" />
-            <div className="absolute bottom-2 inset-x-0 mx-1 flex justify-center">
-              <span className="bg-[#d82a27] text-white text-[10px] sm:text-[11px] font-bold px-1.5 py-0.5 rounded text-center whitespace-nowrap">INSÔNIA/SONO RUIM</span>
-            </div>
-          </div>
+        <div className="w-full mt-6 px-2 flex items-center justify-center">
+          <img 
+            src="https://i.imgur.com/0ctX1mA.png" 
+            alt="Sintomas"
+            referrerPolicy="no-referrer"
+            className="w-full h-auto object-cover rounded-xl shadow-sm border border-slate-100 bg-white"
+          />
         </div>
 
         <div className="w-full px-4 mt-6">
           <button onClick={onNext} className="w-[94%] max-w-[340px] mx-auto bg-[#d82a27] text-white rounded-xl py-4 font-bold text-[15px] hover:bg-[#b02220] transition-colors flex justify-center shadow-none active:scale-[0.98]"
           >
             SIM! SOFRO COM PELO MENOS 1
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-function StepFourteen({ onNext }: { onNext: () => void }) {
-  return (
-    <div className="flex flex-col w-full max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[100dvh] pt-10 pb-32 px-5">
-      <div className="flex flex-col items-center w-full">
-        <div className="bg-[#e8f5e9] text-[#24a048] px-4 py-1.5 rounded-lg text-[13px] font-bold flex items-center justify-center gap-2 mb-6 w-fit mx-auto uppercase">
-          <span>🎁</span> VOCÊ VAI RECEBER TAMBÉM <span>🎁</span>
-        </div>
-        
-        <div className="flex flex-col items-center justify-center mb-4">
-          <span className="bg-[#5c8aff] text-white rounded w-6 h-[22px] flex items-center justify-center text-[14px] font-bold mb-2">1</span>
-          <h2 className="text-[1.1rem] sm:text-[1.2rem] font-bold text-center text-slate-800 leading-tight text-balance">
-            Receitas: <strong className="text-[#24a048] font-black">Doces Gostosos</strong> pra comer sem culpa 😋
-          </h2>
-        </div>
-
-        <div className="w-full rounded-2xl overflow-hidden flex items-center justify-center p-0.5 relative mb-6">
-          <img 
-            src="https://images.unsplash.com/photo-1550617931-e17a7b70dce2?q=80&w=800&auto=format&fit=crop" 
-            alt="Doces Gostosos"
-            referrerPolicy="no-referrer"
-            className="w-full aspect-[4/3] object-cover rounded-2xl shadow-sm border border-slate-100"
-          />
-        </div>
-
-        <div className="flex flex-col items-center justify-center mb-4">
-          <span className="bg-[#5c8aff] text-white rounded w-6 h-[22px] flex items-center justify-center text-[14px] font-bold mb-2">2</span>
-          <h2 className="text-[1.1rem] sm:text-[1.2rem] font-bold text-center text-slate-800 leading-tight text-balance">
-            +de 100 Receitas de <strong className="text-[#24a048] font-black">Salgados, Massas e Lanches</strong>
-          </h2>
-        </div>
-
-        <div className="w-full rounded-2xl overflow-hidden flex items-center justify-center p-0.5 relative">
-          <img 
-            src="https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?q=80&w=800&auto=format&fit=crop" 
-            alt="Salgados e Massas"
-            referrerPolicy="no-referrer"
-            className="w-full aspect-[4/3] object-cover rounded-2xl shadow-sm border border-slate-100"
-          />
-        </div>
-      </div>
-
-      <div className="fixed bottom-0 left-0 w-full bg-gradient-to-t from-white via-white/90 to-transparent pt-10 pb-3 z-50 px-5 pointer-events-none">
-        <div className="max-w-[480px] mx-auto w-full pointer-events-auto">
-          <button onClick={onNext} className="w-[94%] max-w-[340px] mx-auto bg-[#24a048] text-white rounded-xl py-4 font-bold text-[15px] sm:text-lg whitespace-nowrap hover:bg-[#1a7f38] transition-colors active:scale-[0.98] flex items-center justify-center gap-2 shadow-xl shadow-[#24a048]/20" style={{ boxShadow: '0 10px 25px -5px rgba(36, 160, 72, 0.4)' }}>
-            QUERO EMAGRECER <span className="bg-white/20 rounded text-xs px-1 py-0.5">✔</span>
           </button>
         </div>
       </div>
@@ -641,58 +713,24 @@ function StepFifteen({ onNext }: { onNext: () => void }) {
           é para você que <span className="text-xl">👇🏼</span>
         </h1>
 
-        <div className="w-full bg-[#e53935] rounded-[24px] p-4 flex relative overflow-hidden mb-8 min-h-[300px] shadow-sm">
-          <div className="w-[45%] h-full absolute left-0 top-0 bottom-0 bg-white/10 overflow-hidden">
-            <img 
-              src="https://images.unsplash.com/photo-1574400788625-f3ae1016dc25?q=80&w=400&auto=format&fit=crop"
-              className="w-full h-full object-cover mix-blend-multiply opacity-80 scale-110 object-left-top"
-              alt="Desanimada"
-            />
-          </div>
-          
-          <div className="w-[58%] ml-auto flex flex-col gap-2.5 z-10 py-1 justify-center relative">
-            <div className="bg-white text-[#e53935] font-black text-[12.5px] sm:text-[13px] leading-tight p-2.5 pt-2 pb-2 rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] text-center uppercase tracking-tighter w-[110%] -ml-[10%] relative">
-              ESTÁ DESANIMADA, SEM ENERGIA E DISPOSIÇÃO 😴
-            </div>
-            <div className="bg-white text-[#e53935] font-black text-[12.5px] sm:text-[13px] leading-tight p-2.5 pt-2 pb-2 rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] text-center uppercase tracking-tighter w-[110%] -ml-[10%] relative">
-              ACUMULOU MUITA 😥😥 GORDURA NA BARRIGA
-            </div>
-            <div className="bg-white text-[#e53935] font-black text-[12.5px] sm:text-[13px] leading-tight p-2.5 pt-2 pb-2 rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] text-center uppercase tracking-tighter w-[110%] -ml-[10%] relative">
-              JÁ TENTOU DE TUDO PARA EMAGRECER 😭
-            </div>
-            <div className="bg-white text-[#e53935] font-black text-[12.5px] sm:text-[13px] leading-tight p-2.5 pt-2 pb-2 rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] text-center uppercase tracking-tighter w-[110%] -ml-[10%] relative">
-              PERDEU LIBIDO E DESEJO 🤫
-            </div>
-          </div>
+        <div className="w-full mb-8 flex items-center justify-center">
+          <img 
+            src="https://i.imgur.com/fGMkemT.png"
+            className="w-full h-auto object-cover rounded-[24px] shadow-sm border border-slate-100"
+            alt="Desanimada"
+          />
         </div>
 
         <h2 className="text-[1.1rem] sm:text-[1.2rem] font-bold text-center text-slate-800 leading-tight mb-6 uppercase">
           E PARA VOCÊ QUE QUER <span className="text-xl">👇🏼</span>
         </h2>
 
-        <div className="w-full bg-[#00b050] rounded-[24px] p-4 flex relative overflow-hidden min-h-[300px] shadow-sm">
-          <div className="w-[45%] h-full absolute left-0 top-0 bottom-0 bg-white/10 overflow-hidden">
-            <img 
-              src="https://images.unsplash.com/photo-1549476464-37392f717541?q=80&w=400&auto=format&fit=crop"
-              className="w-full h-full object-cover mix-blend-multiply opacity-90 scale-110 object-left-top"
-              alt="Feliz e magra"
-            />
-          </div>
-          
-          <div className="w-[58%] ml-auto flex flex-col gap-2.5 z-10 py-1 justify-center relative">
-            <div className="bg-white text-[#00b050] font-black text-[12.5px] sm:text-[13px] leading-tight p-2.5 pt-2 pb-2 rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] text-center uppercase tracking-tighter w-[110%] -ml-[10%] relative">
-              QUER EMAGRECER 1KG POR SEMANA 🥰💚😀💚
-            </div>
-            <div className="bg-white text-[#00b050] font-black text-[12.5px] sm:text-[13px] leading-tight p-2.5 pt-2 pb-2 rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] text-center uppercase tracking-tighter w-[110%] -ml-[10%] relative">
-              QUER VOLTAR A VESTIR 😍 SUAS ROUPAS FAVORITAS
-            </div>
-            <div className="bg-white text-[#00b050] font-black text-[12.5px] sm:text-[13px] leading-tight p-2.5 pt-2 pb-2 rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] text-center uppercase tracking-tighter w-[110%] -ml-[10%] relative">
-              QUER SECAR SEM PASSAR FOME E SEM RESTRIÇÕES
-            </div>
-            <div className="bg-white text-[#00b050] font-black text-[12.5px] sm:text-[13px] leading-tight p-2.5 pt-2 pb-2 rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] text-center uppercase tracking-tighter w-[110%] -ml-[10%] relative">
-              QUER ALIVIAR OS SINTOMAS DO CLIMATÉRIO E MENOPAUSA 🥰🥰
-            </div>
-          </div>
+        <div className="w-full flex items-center justify-center">
+          <img 
+            src="https://i.imgur.com/pi6fvpY.png"
+            className="w-full h-auto object-cover rounded-[24px] shadow-sm border border-slate-100"
+            alt="Feliz e magra"
+          />
         </div>
 
       </div>
@@ -766,26 +804,12 @@ function StepSixteen({ onNext }: { onNext: () => void }) {
               <span className="text-slate-800 font-bold text-[12.5px] sm:text-[13px] leading-tight uppercase"><strong className="text-[#d82a27] line-through mr-1 opacity-80">(R$ 99)</strong> CHÁS HORMONAIS PARA ALÍVIO DE SINTOMAS</span>
             </div>
           </div>
-
-          <div className="bg-[#e8f5e9] border border-[#c8e6c9] rounded-xl p-4 flex items-center gap-3 shadow-sm">
-            <span className="text-2xl drop-shadow-sm">🍫</span>
-            <div className="flex flex-col">
-              <span className="text-slate-800 font-bold text-[12.5px] sm:text-[13px] leading-tight uppercase"><strong className="text-[#d82a27] line-through mr-1 opacity-80">(R$ 99)</strong> <strong className="text-[#24a048]">DOCES GOSTOSOS</strong> PARA COMER SEM CULPA</span>
-            </div>
-          </div>
-
-          <div className="bg-[#e8f5e9] border border-[#c8e6c9] rounded-xl p-4 flex items-center gap-3 shadow-sm">
-            <span className="text-2xl drop-shadow-sm">🍔</span>
-            <div className="flex flex-col">
-              <span className="text-slate-800 font-bold text-[12.5px] sm:text-[13px] leading-tight uppercase"><strong className="text-[#d82a27] line-through mr-1 opacity-80">(R$ 99)</strong> +DE 100 RECEITAS DE <strong className="text-[#24a048]">SALGADOS, MASSAS E LANCHES</strong></span>
-            </div>
-          </div>
         </div>
 
         <div className="flex flex-col items-center justify-center mb-4 text-center">
           <p className="text-[15px] font-bold text-slate-800 mb-1">Tudo isso poderia custar facilmente</p>
           <div className="relative inline-block mb-1">
-            <span className="text-[36px] font-black text-[#d82a27] line-through decoration-slate-800/40 decoration-[3px]">R$ 894</span>
+            <span className="text-[36px] font-black text-[#d82a27] line-through decoration-slate-800/40 decoration-[3px]">R$ 696</span>
           </div>
           <p className="text-[14px] font-bold text-slate-800 mt-2 text-balance">
             Mas você não pagará <strong className="text-[#24a048]">nem metade disso...</strong>
@@ -809,7 +833,7 @@ function StepSixteen({ onNext }: { onNext: () => void }) {
 function StepSeventeen() {
   const PrimaryButton = () => (
     <div className="flex w-full justify-center mt-4 mb-4">
-      <button className="w-[94%] max-w-[340px] bg-[#24a048] text-white rounded-xl py-3.5 sm:py-4 font-bold text-[14px] sm:text-base whitespace-nowrap hover:bg-[#1a7f38] transition-colors active:scale-[0.98] flex items-center justify-center gap-2 shadow-xl shadow-[#24a048]/20" style={{ boxShadow: '0 10px 25px -5px rgba(36, 160, 72, 0.4)' }}>
+      <button className="w-[94%] max-w-[340px] mx-auto bg-[#24a048] text-white rounded-xl py-4 font-bold text-[15px] sm:text-[16px] whitespace-nowrap hover:bg-[#1a7f38] transition-colors active:scale-[0.98] flex items-center justify-center gap-2 shadow-xl shadow-[#24a048]/20" style={{ boxShadow: '0 10px 25px -5px rgba(36, 160, 72, 0.4)' }}>
         QUERO ELIMINAR 1KG POR SEMANA
       </button>
     </div>
@@ -818,7 +842,7 @@ function StepSeventeen() {
   const PriceBlock = () => (
     <div className="flex flex-col items-center justify-center mt-2 mb-4">
       <div className="bg-[#d82a27] text-white font-black text-lg px-2 py-0.5 rounded-sm line-through decoration-2 decoration-white/70">
-        De: R$ 894,00
+        De: R$ 696,00
       </div>
       <div className="flex items-baseline text-[#24a048] font-black mt-2">
         <span className="text-xl">3x de</span>
@@ -837,7 +861,7 @@ function StepSeventeen() {
   );
 
   return (
-    <div className="flex flex-col w-full max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[100dvh] pt-6 pb-24 px-4 bg-white text-slate-800">
+    <div className="flex flex-col w-full max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[100dvh] pt-6 pb-6 px-4 bg-white text-slate-800">
       
       {/* 1. Recado da Nutri */}
       <div className="flex flex-col items-center w-full mb-10">
@@ -916,18 +940,6 @@ function StepSeventeen() {
               <span className="text-slate-800 font-bold text-[12.5px] sm:text-[13px] leading-tight uppercase"><strong className="text-[#d82a27] line-through mr-1 opacity-80">(R$ 99)</strong> CHÁS HORMONAIS PARA ALÍVIO DE SINTOMAS</span>
             </div>
           </div>
-          <div className="bg-[#e8f5e9] border border-[#c8e6c9] rounded-xl p-4 flex items-center gap-3 shadow-sm">
-            <span className="text-2xl drop-shadow-sm">🍫</span>
-            <div className="flex flex-col">
-              <span className="text-slate-800 font-bold text-[12.5px] sm:text-[13px] leading-tight uppercase"><strong className="text-[#d82a27] line-through mr-1 opacity-80">(R$ 99)</strong> DOCES PARA COMER SEM CULPA</span>
-            </div>
-          </div>
-          <div className="bg-[#e8f5e9] border border-[#c8e6c9] rounded-xl p-4 flex items-center gap-3 shadow-sm">
-            <span className="text-2xl drop-shadow-sm">🍔</span>
-            <div className="flex flex-col">
-              <span className="text-slate-800 font-bold text-[12.5px] sm:text-[13px] leading-tight uppercase"><strong className="text-[#d82a27] line-through mr-1 opacity-80">(R$ 99)</strong> +DE 100 RECEITAS DE LANCHES</span>
-            </div>
-          </div>
         </div>
         <PrimaryButton />
       </div>
@@ -939,14 +951,12 @@ function StepSeventeen() {
           <span className="text-[#24a048] underline decoration-2 underline-offset-4">Ou emagrecer 1kg/semana?</span>
         </h2>
 
-        <div className="w-full relative rounded-xl overflow-hidden mb-6 flex">
-          <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&fit=crop" className="w-1/2 h-48 object-cover" alt="Engordando" />
-          <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=400&fit=crop" className="w-1/2 h-48 object-cover" alt="Emagrecendo" />
-          
-          <div className="absolute bottom-3 left-2 right-2 flex justify-between gap-2">
-            <div className="bg-[#d82a27] text-white font-bold text-[10px] leading-tight p-1.5 text-center w-1/2 rounded-md uppercase">Continuar engordando?</div>
-            <div className="bg-[#24a048] text-white font-bold text-[10px] leading-tight p-1.5 text-center w-1/2 rounded-md uppercase">Emagrecer 1kg por semana?</div>
-          </div>
+        <div className="w-full mb-6 flex items-center justify-center">
+          <img 
+            src="https://i.imgur.com/HrnsfcN.png"
+            className="w-full h-auto object-cover rounded-xl shadow-sm border border-slate-100"
+            alt="Comparação"
+          />
         </div>
 
         <p className="text-[12.5px] min-[370px]:text-[13.5px] leading-[1.2] tracking-tighter w-full font-medium text-slate-700 mb-3 px-0">
@@ -985,15 +995,13 @@ function StepSeventeen() {
           😭 Eu comecei a atender mulheres na menopausa <strong>observando a luta da minha mãe contra a obesidade</strong>, por anos ela tentou de tudo <u>mas nunca aplicou um protocolo 100% focado na menopausa.</u>
         </p>
 
-        <div className="w-full relative flex items-center justify-center gap-2 mb-6 bg-slate-100 py-6 px-2 rounded-xl">
-          <img src="https://images.unsplash.com/photo-1611042553365-9b101441c135?q=80&w=200&fit=crop" className="w-[110px] h-[110px] object-cover rounded shadow-md -rotate-6" alt="Mãe antes" />
-          <img src="https://images.unsplash.com/photo-1581044777550-4cfa60707c03?q=80&w=200&fit=crop" className="w-[110px] h-[110px] object-cover rounded shadow-md rotate-3" alt="Mãe depois" />
-          <div className="absolute -bottom-2 right-4 text-[12px] font-bold text-slate-600 italic bg-white px-2 py-0.5 rounded shadow-sm border border-slate-200">
-            <span className="text-[#24a048]">↩</span> Antes e depois<br/>da minha mãe
-          </div>
+        <div className="w-full mb-6 flex items-center justify-center px-1">
+          <img 
+            src="https://i.imgur.com/yTw4FZM.png"
+            className="w-full h-auto object-cover rounded-xl shadow-sm border border-slate-100"
+            alt="Antes e depois da minha mãe"
+          />
         </div>
-
-        <PrimaryButton />
 
         <p className="text-[15px] text-slate-800 mb-4 px-2 mt-6">
           👉 Foi aí que me especializei e criei um <strong>método exclusivo para Resetar o Metabolismo Morto</strong> de mulheres no climatério e menopausa <u>de forma 100% natural.</u>
@@ -1016,22 +1024,7 @@ function StepSeventeen() {
           </h3>
           <p className="text-sm font-bold text-slate-600 mb-3">Clique no triângulo para ouvir 👇🏼</p>
           
-          <div className="bg-[#0f172a] rounded-[18px] p-2 pr-4 flex items-center gap-3 w-full max-w-[340px] mx-auto shadow-md">
-            <div className="bg-slate-700 w-10 h-10 rounded-full flex items-center justify-center shrink-0">
-              <span className="text-white text-lg ml-1">▶</span>
-            </div>
-            <div className="flex-1 flex items-center gap-1 opacity-50">
-              <div className="w-1 h-3 bg-white rounded-full"></div>
-              <div className="w-1 h-5 bg-white rounded-full"></div>
-              <div className="w-1 h-4 bg-white rounded-full"></div>
-              <div className="w-1 h-6 bg-white rounded-full"></div>
-              <div className="w-1 h-3 bg-white rounded-full"></div>
-              <div className="w-1 h-5 bg-white rounded-full"></div>
-              <div className="w-1 h-4 bg-white rounded-full"></div>
-              <div className="w-1 h-6 bg-white rounded-full"></div>
-            </div>
-            <div className="bg-slate-300 w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[10px]">🎙️</div>
-          </div>
+          <WhatsAppAudio isMic={true} />
         </div>
 
         <div className="mb-8 w-full text-center">
@@ -1040,20 +1033,7 @@ function StepSeventeen() {
           </h3>
           <p className="text-sm font-bold text-slate-600 mb-3">Clique no triângulo para ouvir 👇🏼</p>
           
-          <div className="bg-[#0f172a] rounded-[18px] p-2 pr-4 flex items-center gap-3 w-full max-w-[340px] mx-auto shadow-md">
-            <div className="bg-slate-700 w-10 h-10 rounded-full flex items-center justify-center shrink-0">
-              <span className="text-white text-lg ml-1">▶</span>
-            </div>
-            <div className="flex-1 flex items-center gap-1 opacity-50">
-              <div className="w-1 h-3 bg-white rounded-full"></div>
-              <div className="w-1 h-5 bg-white rounded-full"></div>
-              <div className="w-1 h-4 bg-white rounded-full"></div>
-              <div className="w-1 h-2 bg-white rounded-full"></div>
-              <div className="w-1 h-5 bg-white rounded-full"></div>
-              <div className="w-1 h-4 bg-white rounded-full"></div>
-            </div>
-            <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=100&fit=crop" className="w-8 h-8 rounded-full shrink-0 object-cover" alt="Profile" />
-          </div>
+          <WhatsAppAudio avatar="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=100&fit=crop" />
         </div>
 
         <PrimaryButton />
@@ -1066,20 +1046,12 @@ function StepSeventeen() {
           <span className="whitespace-nowrap"><strong className="text-[#24a048] font-black">Dieta Hormonal</strong> 👇🏼 😍</span>
         </h2>
 
-        <div className="w-full mt-2 bg-[#4caf50] rounded-[20px] p-0.5 overflow-hidden shadow-md my-4">
-          <div className="text-center text-white font-bold text-xs py-1.5 uppercase tracking-wide">
-            ELIZETE PERDEU <span className="underline">4KG EM 21 DIAS</span><br/>COM A DIETA HORMONAL
-          </div>
-          <div className="flex bg-white h-[260px]">
-            <div className="w-1/2 h-full border-r border-[#4caf50] relative">
-               <img src="https://images.unsplash.com/photo-1542596594-649edbc13630?q=80&w=400&fit=crop" className="w-full h-full object-cover" alt="Antes" />
-               <div className="absolute bottom-2 left-2 right-2 bg-[#d82a27] text-white text-[10px] font-bold text-center py-1 rounded">ANTES DA<br/>DIETA HORMONAL</div>
-            </div>
-            <div className="w-1/2 h-full relative">
-               <img src="https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=400&fit=crop" className="w-full h-full object-cover opacity-90" alt="Depois" />
-               <div className="absolute bottom-2 left-2 right-2 bg-[#4caf50] text-white text-[10px] font-bold text-center py-1 rounded">DEPOIS DA<br/>DIETA HORMONAL</div>
-            </div>
-          </div>
+        <div className="w-full mt-4 mb-6 flex items-center justify-center px-1">
+          <img 
+            src="https://i.imgur.com/L07nlO6.png"
+            className="w-full h-auto object-cover rounded-xl shadow-sm border border-slate-100"
+            alt="Todas elas emagreceram"
+          />
         </div>
 
         <h3 className="text-[1.1rem] min-[370px]:text-[1.15rem] tracking-tighter font-bold text-center text-slate-800 mt-6 mb-2 flex flex-col items-center w-full">
@@ -1094,7 +1066,7 @@ function StepSeventeen() {
           </h3>
           <img src="https://images.unsplash.com/photo-1594824436998-ddedefa57053?q=80&w=200&fit=crop" className="absolute right-0 -bottom-2 w-28 opacity-80" alt="Nutri" />
           <div className="w-full mt-6 z-10 flex justify-center">
-            <button className="w-[94%] max-w-[340px] bg-[#24a048] border-2 border-white/50 text-white rounded-xl py-3.5 font-bold text-[14px] sm:text-base whitespace-nowrap hover:bg-[#1a7f38] transition-colors flex items-center justify-center inset-0 backdrop-blur-sm">
+            <button className="w-[94%] max-w-[340px] mx-auto bg-[#24a048] border-2 border-white/50 text-white rounded-xl py-4 font-bold text-[15px] sm:text-[16px] whitespace-nowrap hover:bg-[#1a7f38] transition-colors flex items-center justify-center inset-0 backdrop-blur-sm shadow-xl shadow-[#24a048]/20" style={{ boxShadow: '0 10px 25px -5px rgba(36, 160, 72, 0.4)' }}>
               QUERO ELIMINAR 1KG POR SEMANA
             </button>
           </div>
@@ -1261,7 +1233,7 @@ export default function App() {
 
   const nextStep = () => {
     window.scrollTo(0, 0);
-    setStep(s => Math.min(s + 1, 17));
+    setStep(s => Math.min(s + 1, 15));
   };
 
   return (
@@ -1279,11 +1251,9 @@ export default function App() {
         {step === 10 && <StepTen onNext={nextStep} />}
         {step === 11 && <StepEleven onNext={nextStep} />}
         {step === 12 && <StepTwelve onNext={nextStep} />}
-        {step === 13 && <StepThirteen onNext={nextStep} />}
-        {step === 14 && <StepFourteen onNext={nextStep} />}
-        {step === 15 && <StepFifteen onNext={nextStep} />}
-        {step === 16 && <StepSixteen onNext={nextStep} />}
-        {step === 17 && <StepSeventeen />}
+        {step === 13 && <StepFifteen onNext={nextStep} />}
+        {step === 14 && <StepSixteen onNext={nextStep} />}
+        {step === 15 && <StepSeventeen />}
       </main>
     </div>
   );
